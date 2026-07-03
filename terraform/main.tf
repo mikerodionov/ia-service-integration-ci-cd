@@ -45,8 +45,8 @@ module "gce-ilb" {
   name         = "ai-backend-ilb"
   ports        = ["8000"] # The port your FastAPI app runs on
   health_check = google_compute_region_health_check.hc.id
-  source_tags  = ["allow-group-traffic", "cloud-run-proxy"]
-  target_tags  = ["ai-fastapi-backend"]
+  source_tags  = ["cloud-run-proxy"] # Tag applied to your serverless connector/proxy
+  target_tags  = ["ai-backend"]      # Matches your firewall target_tags exactly
   network      = google_compute_network.vpc.name
   subnetwork   = google_compute_subnetwork.subnet.name
   backends = [
