@@ -1,16 +1,16 @@
 # 1. Instance Template & MIG (Using official Google Module)
 module "mig_template" {
-  source               = "terraform-google-modules/vm/google//modules/instance_template"
-  version              = "~> 11.0"
-  project_id           = var.project_id
-  machine_type         = "n1-standard-4"
-  tags                 = ["ai-backend"]
-  subnetwork           = google_compute_subnetwork.backend_subnet.id
-  service_account      = {
+  source       = "terraform-google-modules/vm/google//modules/instance_template"
+  version      = "~> 11.0"
+  project_id   = var.project_id
+  machine_type = "n1-standard-4"
+  tags         = ["ai-backend"]
+  subnetwork   = google_compute_subnetwork.backend_subnet.id
+  service_account = {
     email  = google_service_account.backend_sa.email
     scopes = ["cloud-platform"]
   }
-  
+
   # Advanced Details: GPU Configuration
   gpu = {
     type  = "nvidia-tesla-t4"
@@ -39,19 +39,20 @@ module "mig" {
 # 2. Internal Application Load Balancer
 module "gce-ilb" {
   source       = "GoogleCloudPlatform/lb-internal/google"
-  version      = "~> 5.0"
+  version      = "~> 6.0" # Or your current pinned version
   project      = var.project_id
   region       = var.region
-  name         = "ai-internal-lb"
-  ports        = ["8000"]
-  health_check = {
-    type = "http"
-    port = 8000
-    request_path = "/"
-  }
+  name         = "ai-backend-ilb"
+  ports        = ["8000"] # The port your FastAPI app runs on
+  health_check = google_compute_region_health_check.hc.id
+  source_tags  = ["allow-group-traffic", "cloud-run-proxy"]
+  target_tags  = ["ai-fastapi-backend"]
+  network      = google_compute_network.vpc.name
+  subnetwork   = google_compute_subnetwork.subnet.name
   backends = [
     {
-      group = module.mig.instance_group
+      group       = google_compute_region_instance_group_manager.mig.instance_group
+      description = "MIG Backend Service"
     }
   ]
 }
@@ -64,7 +65,7 @@ resource "google_cloud_run_v2_service" "proxy" {
 
   template {
     service_account = google_service_account.proxy_sa.email
-    
+
     vpc_access {
       network_interfaces {
         network    = google_compute_network.vpc.name
@@ -75,7 +76,7 @@ resource "google_cloud_run_v2_service" "proxy" {
 
     containers {
       image = var.proxy_image
-      
+
       env {
         name = "EXPECTED_SECRET"
         value_source {
