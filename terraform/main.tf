@@ -1,4 +1,4 @@
-# 1. Instance Template & MIG (Using official Google Module)
+# 1. Instance Template & MIG (official Google Module)
 module "mig_template" {
   source       = "terraform-google-modules/vm/google//modules/instance_template"
   version      = "~> 11.0"
@@ -38,20 +38,32 @@ module "mig" {
 
 # 2. Internal Application Load Balancer
 module "gce-ilb" {
-  source       = "GoogleCloudPlatform/lb-internal/google"
-  version      = "~> 6.0" # Or your current pinned version
-  project      = var.project_id
-  region       = var.region
-  name         = "ai-backend-ilb"
-  ports        = ["8000"] # The port your FastAPI app runs on
-  health_check = google_compute_region_health_check.hc.id
-  source_tags  = ["cloud-run-proxy"] # Tag applied to your serverless connector/proxy
-  target_tags  = ["ai-backend"]      # Matches your firewall target_tags exactly
-  network      = google_compute_network.vpc.name
-  subnetwork   = google_compute_subnetwork.subnet.name
+  source  = "GoogleCloudPlatform/lb-internal/google"
+  version = "~> 6.0"
+  project = var.project_id
+  region  = var.region
+  name    = "ai-backend-ilb"
+  ports   = ["8000"]
+  # This module expects a health_check object and creates the health check itself.
+  health_check = {
+    type                = "http"
+    check_interval_sec  = 5
+    healthy_threshold   = 2
+    timeout_sec         = 5
+    unhealthy_threshold = 2
+    port                = 8000
+    request_path        = "/health"
+    enable_log          = false
+  }
+  source_tags                  = []
+  target_tags                  = ["ai-backend"]
+  create_backend_firewall      = false
+  create_health_check_firewall = false
+  network                      = google_compute_network.vpc.name
+  subnetwork                   = google_compute_subnetwork.backend_subnet.name
   backends = [
     {
-      group       = google_compute_region_instance_group_manager.mig.instance_group
+      group       = module.mig.instance_group
       description = "MIG Backend Service"
     }
   ]
@@ -92,7 +104,10 @@ resource "google_cloud_run_v2_service" "proxy" {
       }
     }
   }
-  depends_on = [google_secret_manager_secret_version.jira_secret_version]
+  depends_on = [
+    google_secret_manager_secret_version.jira_secret_version,
+    google_secret_manager_secret_iam_member.proxy_secret_access,
+  ]
 }
 
 # Allow public unauthenticated access to the Cloud Run proxy to receive Jira Webhooks

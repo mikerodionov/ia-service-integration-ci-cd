@@ -22,6 +22,10 @@ def verify_token(authorization: str = Header(None)):
     if not authorization or "Bearer" not in authorization:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid GCP Token")
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 @app.post("/process-ticket", dependencies=[Depends(verify_token)])
 async def process_ticket(payload: JiraPayload):
     return {

@@ -9,6 +9,15 @@ The architecture strictly adheres to a 99.95% availability SLO by utilizing a Re
 2. **Internal HTTP Load Balancer:** Distributes private VPC traffic across multiple availability zones.
 3. **Compute Engine MIG:** Hosts the Python/FastAPI AI application on GPU-enabled instances (provisioned via startup scripts).
 
+## How Application Code Is Deployed
+1. **Proxy service (`app/proxy`)** is built into a container image in GitHub Actions (`deploy.yml`) and pushed to Artifact Registry.
+2. **Backend service (`app/backend`)** is not containerized in this repo. Terraform injects `app/backend/startup.sh` as VM metadata startup script, and each MIG VM installs Python packages and starts FastAPI via systemd.
+3. This split is intentional for this mock architecture:
+   - Cloud Run requires a container image, so `app/proxy/Dockerfile` is mandatory.
+   - The backend is on Compute Engine MIG, where startup scripts are sufficient for a mock/demo workload.
+
+If you want deterministic backend application releases similar to proxy, package backend into an image and run it on GCE with Container-Optimized VM strategy or move backend to GKE/Cloud Run.
+
 ---
 
 ## Deployment Instructions
@@ -33,22 +42,29 @@ To avoid "chicken-or-egg" deployment issues, a bootstrap script is provided to c
    ```
    *Note: The script will prompt you to enter the Jira Webhook Secret you want to use. It will automatically inject this securely into your GitHub Repository Secrets.*
 
-### Step 2: Update Terraform State Configuration
-The bootstrap script outputs the name of your newly created GCS State Bucket. 
+### Step 2: Terraform State Bucket Configuration
+The deploy workflow injects the backend bucket dynamically during `terraform init` using the `TF_STATE_BUCKET` GitHub secret.
 
-1. Open `terraform/providers.tf`.
-2. Update the `bucket` value inside the `backend "gcs"` block with the name provided by the script.
-   ```hcl
-   backend "gcs" {
-     bucket = "YOUR-NEW-BUCKET-NAME"
-     prefix = "terraform/state/ia-service"
-   }
+1. For CI/CD deployment, no edit in `terraform/providers.tf` is required.
+2. For local Terraform runs, initialize with:
+   ```bash
+   terraform init -backend-config="bucket=<YOUR-STATE-BUCKET>"
    ```
 
 ### Step 3: Trigger the Pipeline
-1. Commit your changes to `providers.tf`.
-2. Push the code to the `main` branch of your repository.
-3. Navigate to the **Actions** tab in your GitHub repository to watch the deployment. The pipeline will automatically build the proxy container, push it to Artifact Registry, and apply the Terraform configuration.
+1. Commit your changes.
+2. Push to your repository.
+3. Open **Actions** -> **Deploy AI Architecture**.
+4. Click **Run workflow** (this workflow is `workflow_dispatch` and does not auto-run on push).
+5. Approve the protected `production` environment when prompted, then wait for apply to finish.
+
+### Fork-Friendly Deployment Checklist
+To make this deploy reliably from a fork/new repo:
+1. Ensure GitHub Actions is enabled for the fork.
+2. Run `./bootstrap.sh` from the forked local checkout connected to your fork remote.
+3. Confirm these repository secrets exist: `GCP_PROJECT_ID`, `GCP_SA_KEY`, `TF_VAR_jira_webhook_secret`, `TF_STATE_BUCKET`.
+4. Ensure GCP billing is enabled and required APIs are enabled in the target project.
+5. Run the deploy workflow manually from Actions.
 
 ---
 
@@ -76,6 +92,9 @@ curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
 ```
 *Expected Output:* `{"detail":"Unauthorized: Invalid Webhook Secret"}`
 
+### Additional Backend Verification
+Because backend runs in a private MIG behind an Internal LB, direct public access is not expected. Validate backend health indirectly through the successful webhook test above, and by checking the backend MIG instances are healthy in GCP Console.
+
 ## Cleanup
 
 To avoid unexpected GCP charges, you must cleanly tear down the infrastructure when you are finished.
@@ -91,3 +110,4 @@ To avoid unexpected GCP charges, you must cleanly tear down the infrastructure w
    ```bash
    chmod +x teardown.sh
    ./teardown.sh
+   ```
