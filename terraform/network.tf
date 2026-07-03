@@ -4,7 +4,7 @@ resource "google_compute_network" "vpc" {
 }
 
 resource "google_compute_subnetwork" "backend_subnet" {
-  name          = "ai-backend-subnet"
+  name          = "ai-backend-snet"
   ip_cidr_range = "10.0.1.0/24"
   region        = var.region
   network       = google_compute_network.vpc.id
