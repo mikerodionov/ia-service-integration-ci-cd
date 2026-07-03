@@ -7,6 +7,13 @@ STATE_BUCKET="${PROJECT_ID}-tf-state-bucket"
 GAR_REPO="ai-proxy-repo"
 SA_NAME="github-actions-deployer"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+KEY_FILE="sa-key.json"
+
+cleanup() {
+    rm -f "$KEY_FILE"
+}
+
+trap cleanup EXIT
 
 echo "===================================================="
 echo " Bootstrapping GCP Environment for CI/CD Deployment"
@@ -70,16 +77,32 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 # 5. Generate JSON Key
 echo "[+] Generating Service Account Key..."
-gcloud iam service-accounts keys create sa-key.json --iam-account=$SA_EMAIL > /dev/null
+NEW_KEY_ID=$(gcloud iam service-accounts keys create "$KEY_FILE" \
+    --iam-account="$SA_EMAIL" \
+    --format='value(name.basename())')
 
 # 6. Inject Secrets into GitHub (Requires 'gh' CLI)
 echo "[+] Pushing secrets to GitHub Repository..."
 read -p "Enter your Jira Webhook Secret (e.g., my-secret-123): " JIRA_SECRET
 
 gh secret set GCP_PROJECT_ID -b"$PROJECT_ID"
-gh secret set GCP_SA_KEY < sa-key.json
+gh secret set GCP_SA_KEY < "$KEY_FILE"
 gh secret set TF_VAR_jira_webhook_secret -b"$JIRA_SECRET"
 gh secret set TF_STATE_BUCKET -b"$STATE_BUCKET" # Injected for Partial Config
+
+echo "[+] Pruning older user-managed Service Account keys..."
+OLD_KEYS=$(gcloud iam service-accounts keys list \
+    --iam-account="$SA_EMAIL" \
+    --managed-by=user \
+    --format='value(name.basename())')
+
+for KEY_ID in $OLD_KEYS; do
+    if [ "$KEY_ID" != "$NEW_KEY_ID" ]; then
+        gcloud iam service-accounts keys delete "$KEY_ID" \
+            --iam-account="$SA_EMAIL" \
+            --quiet > /dev/null
+    fi
+done
 
 # 7. Create/Update GitHub Environment Approval Gate
 echo "[+] Configuring GitHub Actions environment protection..."
@@ -130,9 +153,6 @@ EOF
                 fi
         fi
 fi
-
-# Cleanup local key
-rm -f sa-key.json
 
 echo "===================================================="
 echo " ✅ Bootstrap Complete! "
