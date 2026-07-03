@@ -78,9 +78,14 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 # 5. Generate JSON Key
 echo "[+] Generating Service Account Key..."
-NEW_KEY_ID=$(gcloud iam service-accounts keys create "$KEY_FILE" \
-    --iam-account="$SA_EMAIL" \
-    --format='value(name.basename())')
+gcloud iam service-accounts keys create "$KEY_FILE" \
+    --iam-account="$SA_EMAIL" > /dev/null
+
+NEW_KEY_ID=$(jq -r '.private_key_id // empty' "$KEY_FILE")
+if [ -z "$NEW_KEY_ID" ]; then
+    echo "❌ ERROR: Could not determine newly created key id from $KEY_FILE"
+    exit 1
+fi
 
 # 6. Inject Secrets into GitHub (Requires 'gh' CLI)
 echo "[+] Pushing secrets to GitHub Repository..."
