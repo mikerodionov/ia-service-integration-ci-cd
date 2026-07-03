@@ -2,12 +2,18 @@
 
 This repository contains the automated deployment pipeline and Infrastructure as Code (IaC) for integrating a Jira webhook with an internal AI backend hosted on Google Cloud Platform (GCP). 
 
-The architecture strictly adheres to a 99.95% availability SLO by utilizing a Regional Managed Instance Group (MIG) for the FastAPI backend, while maintaining cost-efficiency for bursty traffic using a Serverless Cloud Run authentication proxy.
+The architecture uses a Regional Managed Instance Group (MIG) for the FastAPI backend and a Serverless Cloud Run authentication proxy for bursty ingress.
+
+For demo reliability and low cost, this repository uses the cheapest practical backend VM profile (single `e2-micro` instance, no GPU). This avoids common quota/capacity blockers during hands-on runs.
 
 ## Architecture Overview
+
+![Infrastructure Diagram](img/ia-service-integration.png)
+
+
 1. **Cloud Run (Auth Proxy):** Intercepts Jira webhooks, validates a custom secret via Google Secret Manager, and generates a GCP OIDC token.
 2. **Internal HTTP Load Balancer:** Distributes private VPC traffic across multiple availability zones.
-3. **Compute Engine MIG:** Hosts the Python/FastAPI AI application on GPU-enabled instances (provisioned via startup scripts).
+3. **Compute Engine MIG:** Hosts the Python/FastAPI AI application on low-cost, no-GPU instances (provisioned via startup scripts).
 
 ## How Application Code Is Deployed
 1. **Proxy service (`app/proxy`)** is built into a container image in GitHub Actions (`deploy.yml`) and pushed to Artifact Registry.

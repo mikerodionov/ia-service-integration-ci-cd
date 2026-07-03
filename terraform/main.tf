@@ -3,18 +3,12 @@ module "mig_template" {
   source       = "terraform-google-modules/vm/google//modules/instance_template"
   version      = "~> 11.0"
   project_id   = var.project_id
-  machine_type = "n1-standard-4"
+  machine_type = "e2-micro"
   tags         = ["ai-backend"]
   subnetwork   = google_compute_subnetwork.backend_subnet.id
   service_account = {
     email  = google_service_account.backend_sa.email
     scopes = ["cloud-platform"]
-  }
-
-  # Advanced Details: GPU Configuration
-  gpu = {
-    type  = "nvidia-tesla-t4"
-    count = 1
   }
 
   metadata = {
@@ -29,7 +23,7 @@ module "mig" {
   hostname          = "ai-backend"
   region            = var.region
   instance_template = module.mig_template.self_link
-  target_size       = 2
+  target_size       = 1
   named_ports = [{
     name = "http"
     port = 8000
