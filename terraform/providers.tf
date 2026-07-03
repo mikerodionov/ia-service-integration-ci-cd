@@ -8,7 +8,6 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "YOUR_TERRAFORM_STATE_BUCKET_NAME" # Update this
     prefix = "terraform/state/ia-service"
   }
 }

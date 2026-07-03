@@ -13,6 +13,13 @@ echo " Bootstrapping GCP Environment for CI/CD Deployment"
 echo " Project: $PROJECT_ID"
 echo "===================================================="
 
+# 0. Pre-flight Check: Ensure this is a Git repository
+if [ ! -d ".git" ]; then
+    echo "❌ ERROR: This directory is not a Git repository."
+    echo "Please run 'git init' and 'git remote add origin <URL>' before bootstrapping."
+    exit 1
+fi
+
 # 1. Enable Required APIs
 echo "[+] Enabling required GCP APIs..."
 gcloud services enable \
@@ -33,7 +40,7 @@ else
     echo "    Bucket already exists. Skipping."
 fi
 
-# 3. Create Artifact Registry Repository (Required before GH Actions builds Docker image)
+# 3. Create Artifact Registry Repository
 echo "[+] Creating Artifact Registry for Cloud Run images..."
 if ! gcloud artifacts repositories describe $GAR_REPO --location=$REGION > /dev/null 2>&1; then
     gcloud artifacts repositories create $GAR_REPO \
@@ -48,7 +55,6 @@ fi
 echo "[+] Creating CI/CD Service Account..."
 gcloud iam service-accounts create $SA_NAME --display-name="GitHub Actions Deployer" 2>/dev/null || true
 
-# Grant permissions (Owner used here strictly for assignment simplicity since TF creates IAM bindings)
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SA_EMAIL" \
     --role="roles/owner" > /dev/null
@@ -64,12 +70,13 @@ read -p "Enter your Jira Webhook Secret (e.g., my-secret-123): " JIRA_SECRET
 gh secret set GCP_PROJECT_ID -b"$PROJECT_ID"
 gh secret set GCP_SA_KEY < sa-key.json
 gh secret set TF_VAR_jira_webhook_secret -b"$JIRA_SECRET"
+gh secret set TF_STATE_BUCKET -b"$STATE_BUCKET" # Injected for Partial Config
 
-# Cleanup
-rm sa-key.json
+# Cleanup local key
+rm -f sa-key.json
 
 echo "===================================================="
-echo " Bootstrap Complete! "
-echo " Please update your terraform/providers.tf file with:"
-echo " bucket = \"$STATE_BUCKET\""
+echo " ✅ Bootstrap Complete! "
+echo " All secrets (including TF_STATE_BUCKET) injected."
+echo " You are ready to commit and push."
 echo "===================================================="

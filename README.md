@@ -75,3 +75,9 @@ curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
   -d '{"ticket_id": "PROJ-994", "action": "summarize_rca"}'
 ```
 *Expected Output:* `{"detail":"Unauthorized: Invalid Webhook Secret"}`
+
+## Cleanup
+
+1. First, delete your infrastructure by running terraform destroy locally from the /terraform folder, or by removing the resources via the GCP Console.
+
+2. Then, run ./teardown.sh to delete the State Bucket, Artifact Registry, and Service Account.
