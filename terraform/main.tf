@@ -67,6 +67,11 @@ module "gce-ilb" {
       description = "MIG Backend Service"
     }
   ]
+
+  depends_on = [
+    google_compute_network.vpc,
+    google_compute_subnetwork.backend_subnet,
+  ]
 }
 
 # 3. Cloud Run Auth Proxy (Direct VPC Egress)
