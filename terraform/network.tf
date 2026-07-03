@@ -10,6 +10,13 @@ resource "google_compute_subnetwork" "backend_subnet" {
   network       = google_compute_network.vpc.id
 }
 
+resource "google_compute_subnetwork" "serverless_connector_subnet" {
+  name          = "ai-serverless-connector-subnet"
+  ip_cidr_range = "10.0.3.0/28"
+  region        = var.region
+  network       = google_compute_network.vpc.id
+}
+
 # Required for Internal Application Load Balancer
 resource "google_compute_subnetwork" "proxy_subnet" {
   name          = "ai-proxy-only-subnet"
@@ -33,6 +40,19 @@ resource "google_compute_router_nat" "nat" {
   region                             = var.region
   nat_ip_allocate_option             = "AUTO_ONLY"
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
+resource "google_vpc_access_connector" "proxy_connector" {
+  name   = "jira-auth-proxy"
+  region = var.region
+
+  subnet {
+    name = google_compute_subnetwork.serverless_connector_subnet.name
+  }
+
+  machine_type  = "e2-micro"
+  min_instances = 2
+  max_instances = 3
 }
 
 # Allow Health Checks

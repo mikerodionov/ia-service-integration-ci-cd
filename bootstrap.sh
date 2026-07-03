@@ -32,6 +32,7 @@ echo "[+] Enabling required GCP APIs..."
 gcloud services enable \
   compute.googleapis.com \
   run.googleapis.com \
+    vpcaccess.googleapis.com \
   secretmanager.googleapis.com \
   iam.googleapis.com \
   cloudresourcemanager.googleapis.com \

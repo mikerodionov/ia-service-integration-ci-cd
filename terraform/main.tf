@@ -74,7 +74,7 @@ module "gce-ilb" {
   ]
 }
 
-# 3. Cloud Run Auth Proxy (Direct VPC Egress)
+# 3. Cloud Run Auth Proxy
 resource "google_cloud_run_v2_service" "proxy" {
   name     = "jira-auth-proxy"
   location = var.region
@@ -84,10 +84,7 @@ resource "google_cloud_run_v2_service" "proxy" {
     service_account = google_service_account.proxy_sa.email
 
     vpc_access {
-      network_interfaces {
-        network    = google_compute_network.vpc.name
-        subnetwork = google_compute_subnetwork.backend_subnet.name
-      }
+      connector = google_vpc_access_connector.proxy_connector.id
       egress = "PRIVATE_RANGES_ONLY"
     }
 
@@ -112,6 +109,7 @@ resource "google_cloud_run_v2_service" "proxy" {
   depends_on = [
     google_secret_manager_secret_version.jira_secret_version,
     google_secret_manager_secret_iam_member.proxy_secret_access,
+    google_vpc_access_connector.proxy_connector,
   ]
 }
 
