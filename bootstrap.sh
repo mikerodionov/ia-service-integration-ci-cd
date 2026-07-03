@@ -116,7 +116,8 @@ REPO_NWO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
 AUTH_USER=$(gh api user --jq .login 2>/dev/null)
 
 if [ -z "$REPO_NWO" ]; then
-        echo "    WARNING: Unable to detect repository from gh CLI. Skipping environment setup."
+    echo "❌ ERROR: Unable to detect repository from gh CLI. Cannot configure environment protection."
+    exit 1
 else
         REPO_OWNER="${REPO_NWO%%/*}"
         APPROVER_LOGIN="$AUTH_USER"
@@ -128,7 +129,8 @@ else
 
         APPROVER_ID=$(gh api "/users/$APPROVER_LOGIN" --jq .id 2>/dev/null)
         if [ -z "$APPROVER_ID" ]; then
-                echo "    WARNING: Unable to resolve GitHub user id for '$APPROVER_LOGIN'. Skipping environment setup."
+            echo "❌ ERROR: Unable to resolve GitHub user id for '$APPROVER_LOGIN'."
+            exit 1
         else
                 ENV_PAYLOAD=$(cat <<EOF
 {
@@ -139,11 +141,7 @@ else
             "type": "User",
             "id": $APPROVER_ID
         }
-    ],
-    "deployment_branch_policy": {
-        "protected_branches": false,
-        "custom_branch_policies": false
-    }
+    ]
 }
 EOF
 )
@@ -152,10 +150,23 @@ EOF
                         -H "Accept: application/vnd.github+json" \
                         "/repos/$REPO_NWO/environments/production" \
                         --input - >/dev/null <<< "$ENV_PAYLOAD"; then
-                        echo "    Environment 'production' configured with required reviewer: $APPROVER_LOGIN"
+                    RULES_COUNT=$(gh api \
+                        -H "Accept: application/vnd.github+json" \
+                        "/repos/$REPO_NWO/environments/production" \
+                        --jq '.protection_rules | length' 2>/dev/null)
+
+                    if [ -z "$RULES_COUNT" ] || [ "$RULES_COUNT" -lt 1 ]; then
+                        echo "❌ ERROR: Environment 'production' has no protection rules after configuration."
+                        echo "    Ensure your token has repo admin settings permission, then rerun bootstrap."
+                        exit 1
+                    fi
+
+                    echo "    Environment 'production' configured and verified with required reviewer: $APPROVER_LOGIN"
                 else
-                        echo "    WARNING: Failed to configure environment protection automatically."
-                        echo "    You may need repo admin permissions and 'repo' scope in gh auth."
+                    echo "❌ ERROR: Failed to configure environment protection automatically."
+                    echo "    This can be caused by repo plan limitations, invalid payload fields,"
+                    echo "    or missing repo settings permissions in gh auth."
+                    exit 1
                 fi
         fi
 fi
