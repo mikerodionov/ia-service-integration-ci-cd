@@ -81,6 +81,56 @@ gh secret set GCP_SA_KEY < sa-key.json
 gh secret set TF_VAR_jira_webhook_secret -b"$JIRA_SECRET"
 gh secret set TF_STATE_BUCKET -b"$STATE_BUCKET" # Injected for Partial Config
 
+# 7. Create/Update GitHub Environment Approval Gate
+echo "[+] Configuring GitHub Actions environment protection..."
+REPO_NWO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+AUTH_USER=$(gh api user --jq .login 2>/dev/null)
+
+if [ -z "$REPO_NWO" ]; then
+        echo "    WARNING: Unable to detect repository from gh CLI. Skipping environment setup."
+else
+        REPO_OWNER="${REPO_NWO%%/*}"
+        APPROVER_LOGIN="$AUTH_USER"
+
+        # Fallback for forks or constrained auth contexts.
+        if [ -z "$APPROVER_LOGIN" ]; then
+                APPROVER_LOGIN="$REPO_OWNER"
+        fi
+
+        APPROVER_ID=$(gh api "/users/$APPROVER_LOGIN" --jq .id 2>/dev/null)
+        if [ -z "$APPROVER_ID" ]; then
+                echo "    WARNING: Unable to resolve GitHub user id for '$APPROVER_LOGIN'. Skipping environment setup."
+        else
+                ENV_PAYLOAD=$(cat <<EOF
+{
+    "wait_timer": 0,
+    "prevent_self_review": false,
+    "reviewers": [
+        {
+            "type": "User",
+            "id": $APPROVER_ID
+        }
+    ],
+    "deployment_branch_policy": {
+        "protected_branches": false,
+        "custom_branch_policies": false
+    }
+}
+EOF
+)
+
+                if gh api --method PUT \
+                        -H "Accept: application/vnd.github+json" \
+                        "/repos/$REPO_NWO/environments/production" \
+                        --input - >/dev/null <<< "$ENV_PAYLOAD"; then
+                        echo "    Environment 'production' configured with required reviewer: $APPROVER_LOGIN"
+                else
+                        echo "    WARNING: Failed to configure environment protection automatically."
+                        echo "    You may need repo admin permissions and 'repo' scope in gh auth."
+                fi
+        fi
+fi
+
 # Cleanup local key
 rm -f sa-key.json
 
