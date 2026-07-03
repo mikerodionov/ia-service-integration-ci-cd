@@ -53,8 +53,17 @@ fi
 
 # 4. Create Service Account for GitHub Actions
 echo "[+] Creating CI/CD Service Account..."
-gcloud iam service-accounts create $SA_NAME --display-name="GitHub Actions Deployer" 2>/dev/null || true
+if ! gcloud iam service-accounts describe $SA_EMAIL > /dev/null 2>&1; then
+    gcloud iam service-accounts create $SA_NAME --display-name="GitHub Actions Deployer"
+    
+    # Advanced Details: GCP IAM Eventual Consistency Mitigation
+    echo "    Waiting 10 seconds for IAM propagation across GCP servers..."
+    sleep 10
+else
+    echo "    Service Account already exists. Skipping creation."
+fi
 
+echo "[+] Assigning roles/owner to Service Account..."
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SA_EMAIL" \
     --role="roles/owner" > /dev/null
@@ -79,4 +88,4 @@ echo "===================================================="
 echo " ✅ Bootstrap Complete! "
 echo " All secrets (including TF_STATE_BUCKET) injected."
 echo " You are ready to commit and push."
-echo "===================================================="
+echo "====================================$STATE_BUCKET================"

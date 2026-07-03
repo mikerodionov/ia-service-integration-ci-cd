@@ -1,0 +1,35 @@
+name: Destroy AI Architecture
+
+on:
+  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    env:
+      REGION: europe-west1
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Init
+      working-directory: ./terraform
+      run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+
+    - name: Terraform Destroy
+      working-directory: ./terraform
+      env:
+        TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
+        # Provide a dummy value so Terraform doesn't crash asking for the image variable
+        TF_VAR_proxy_image: "dummy-value-for-destroy" 
+      run: terraform destroy -auto-approve

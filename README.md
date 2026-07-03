@@ -78,6 +78,16 @@ curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
 
 ## Cleanup
 
-1. First, delete your infrastructure by running terraform destroy locally from the /terraform folder, or by removing the resources via the GCP Console.
+To avoid unexpected GCP charges, you must cleanly tear down the infrastructure when you are finished.
 
-2. Then, run ./teardown.sh to delete the State Bucket, Artifact Registry, and Service Account.
+1. **Destroy the Infrastructure (Via GitHub Actions):**
+   * Navigate to the **Actions** tab in your GitHub repository.
+   * On the left sidebar, click on the **Destroy AI Architecture** workflow.
+   * Click the **Run workflow** dropdown on the right side and execute it. 
+   * *Wait for this pipeline to complete successfully. It will execute `terraform destroy` to remove the Load Balancer, VMs, and Cloud Run proxy.*
+
+2. **Destroy the Bootstrap Resources (Local):**
+   Once the GitHub Actions destroy pipeline finishes, run the local teardown script to delete the foundational resources (Terraform State Bucket, Artifact Registry, and CI/CD Service Account).
+   ```bash
+   chmod +x teardown.sh
+   ./teardown.sh
