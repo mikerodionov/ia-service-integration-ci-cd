@@ -1,18 +1,20 @@
 name: Deploy AI Architecture
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch: # Manual trigger only via GitHub UI
+
+env:
+  REGION: europe-west1
+  GAR_REPO: ai-proxy-repo
+  IMAGE_NAME: jira-auth-proxy
 
 jobs:
-  deploy:
+  plan:
+    name: "Terraform Plan & Container Build"
     runs-on: ubuntu-latest
-    env:
-      REGION: europe-west1
-      GAR_REPO: ai-proxy-repo
-      IMAGE_NAME: jira-auth-proxy
-
+    outputs:
+      proxy_image: ${{ steps.build-image.outputs.image_uri }}
+      
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -29,12 +31,12 @@ jobs:
       run: gcloud auth configure-docker $REGION-docker.pkg.dev
 
     - name: Build and Push Proxy Image
+      id: build-image
       run: |
         IMAGE_URI="$REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$GAR_REPO/$IMAGE_NAME:${{ github.sha }}"
         docker build -t $IMAGE_URI ./app/proxy
         docker push $IMAGE_URI
-        # Export for Terraform to use
-        echo "PROXY_IMAGE=$IMAGE_URI" >> $GITHUB_ENV
+        echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -51,10 +53,44 @@ jobs:
         TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
       run: terraform plan -out=tfplan
 
+    - name: Upload Terraform Plan
+      uses: actions/upload-artifact@v4
+      with:
+        name: tfplan
+        path: ./terraform/tfplan
+        retention-days: 1
+
+  apply:
+    name: "Terraform Apply (Approved)"
+    needs: plan
+    environment: production # Triggers the manual approval gate in GitHub
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Download Terraform Plan
+      uses: actions/download-artifact@v4
+      with:
+        name: tfplan
+        path: ./terraform
+
+    - name: Terraform Init
+      working-directory: ./terraform
+      run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+
     - name: Terraform Apply
-          working-directory: ./terraform
-          env:
-            TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-            TF_VAR_proxy_image: ${{ needs.plan.outputs.proxy_image }}
-            TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
-          run: terraform apply -auto-approve tfplan
+      working-directory: ./terraform
+      env:
+        TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+        TF_VAR_proxy_image: ${{ needs.plan.outputs.proxy_image }}
+        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
+      run: terraform apply -auto-approve tfplan
