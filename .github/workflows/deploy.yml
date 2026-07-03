@@ -47,12 +47,14 @@ jobs:
       working-directory: ./terraform
       env:
         TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-        TF_VAR_proxy_image: ${{ env.PROXY_IMAGE }}
+        TF_VAR_proxy_image: ${{ steps.build-image.outputs.image_uri }}
+        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
       run: terraform plan -out=tfplan
 
     - name: Terraform Apply
-      working-directory: ./terraform
-      env:
-        TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-        TF_VAR_proxy_image: ${{ env.PROXY_IMAGE }}
-      run: terraform apply -auto-approve tfplan
+          working-directory: ./terraform
+          env:
+            TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+            TF_VAR_proxy_image: ${{ needs.plan.outputs.proxy_image }}
+            TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
+          run: terraform apply -auto-approve tfplan
