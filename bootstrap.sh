@@ -89,7 +89,8 @@ fi
 
 # 6. Inject Secrets into GitHub (Requires 'gh' CLI)
 echo "[+] Pushing secrets to GitHub Repository..."
-read -p "Enter your Jira Webhook Secret (e.g., my-secret-123): " JIRA_SECRET
+read -p "Enter your Jira Webhook Secret (default: my-secret-123): " JIRA_SECRET
+JIRA_SECRET=${JIRA_SECRET:-my-secret-123}
 
 gh secret set GCP_PROJECT_ID -b"$PROJECT_ID"
 gh secret set GCP_SA_KEY < "$KEY_FILE"
