@@ -1,0 +1,70 @@
+# =========================
+# Python / Application
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env
+
+# =========================
+# Terraform / Infrastructure
+# =========================
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files (These contain sensitive data and should be in a remote GCS bucket)
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Ignore override files as they are usually used to override resources locally
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore transient lock info files
+.terraform.tfstate.lock.info
+
+# Ignore tfvars files as they often contain secrets (e.g., Jira Webhook Secret)
+*.tfvars
+*.tfvars.json
+
+# =========================
+# OS / IDE
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
