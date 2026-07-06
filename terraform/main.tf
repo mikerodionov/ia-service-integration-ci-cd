@@ -17,12 +17,12 @@ module "mig_template" {
 }
 
 module "mig" {
-  source            = "terraform-google-modules/vm/google//modules/mig"
-  version           = "~> 11.0"
-  project_id        = var.project_id
-  hostname          = "ai-backend"
-  region            = var.region
-  instance_template = module.mig_template.self_link
+  source              = "terraform-google-modules/vm/google//modules/mig"
+  version             = "~> 11.0"
+  project_id          = var.project_id
+  hostname            = "ai-backend"
+  region              = var.region
+  instance_template   = module.mig_template.self_link
   autoscaling_enabled = "true"
   min_replicas        = 1
   max_replicas        = 3
@@ -86,7 +86,7 @@ resource "google_cloud_run_v2_service" "proxy" {
 
     vpc_access {
       connector = google_vpc_access_connector.proxy_connector.id
-      egress = "PRIVATE_RANGES_ONLY"
+      egress    = "PRIVATE_RANGES_ONLY"
     }
 
     containers {
