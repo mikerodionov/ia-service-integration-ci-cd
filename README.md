@@ -82,6 +82,7 @@ You can test the end-to-end flow from your local terminal using the following `c
 
 **Test Success (Valid Secret):**
 ```bash
+export CLOUD_RUN_URL="$(gcloud run services describe jira-auth-proxy --region=europe-west1 --format='value(status.url)')"
 curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
   -H "Content-Type: application/json" \
   -H "X-Jira-Webhook-Secret: my-secret-123" \
@@ -91,6 +92,7 @@ curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
 
 **Test Failure (Invalid Secret):**
 ```bash
+export CLOUD_RUN_URL="$(gcloud run services describe jira-auth-proxy --region=europe-west1 --format='value(status.url)')"
 curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
   -H "Content-Type: application/json" \
   -H "X-Jira-Webhook-Secret: WRONG-PASSWORD" \
