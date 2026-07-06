@@ -39,7 +39,7 @@ jobs:
         retention-days: 1
 
   destroy:
-    name: "Terraform Destroy Apply (Approved)"
+    name: "Terraform Destroy Apply"
     needs: plan-destroy
     environment: production # Triggers the manual approval gate in GitHub
     runs-on: ubuntu-latest
