@@ -45,6 +45,16 @@ jobs:
       working-directory: ./terraform
       run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
 
+    - name: Terraform Lint & Validate
+      working-directory: ./terraform
+      env:
+        TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+        TF_VAR_proxy_image: ${{ steps.build-image.outputs.image_uri }}
+        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
+      run: |
+        terraform fmt -check
+        terraform validate
+
     - name: Terraform Plan
       working-directory: ./terraform
       env:
@@ -89,8 +99,4 @@ jobs:
 
     - name: Terraform Apply
       working-directory: ./terraform
-      env:
-        TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-        TF_VAR_proxy_image: ${{ needs.plan.outputs.proxy_image }}
-        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
       run: terraform apply -auto-approve tfplan

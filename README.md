@@ -83,7 +83,7 @@ You can test the end-to-end flow from your local terminal using the following `c
 **Test Success (Valid Secret):**
 ```bash
 export CLOUD_RUN_URL="$(gcloud run services describe jira-auth-proxy --region=europe-west1 --format='value(status.url)')"
-curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
+curl -X POST $CLOUD_RUN_URL/webhook \
   -H "Content-Type: application/json" \
   -H "X-Jira-Webhook-Secret: my-secret-123" \
   -d '{"ticket_id": "PROJ-994", "action": "summarize_rca"}'
@@ -93,7 +93,7 @@ curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
 **Test Failure (Invalid Secret):**
 ```bash
 export CLOUD_RUN_URL="$(gcloud run services describe jira-auth-proxy --region=europe-west1 --format='value(status.url)')"
-curl -X POST <YOUR_CLOUD_RUN_URL>/webhook \
+curl -X POST $CLOUD_RUN_URL/webhook \
   -H "Content-Type: application/json" \
   -H "X-Jira-Webhook-Secret: WRONG-PASSWORD" \
   -d '{"ticket_id": "PROJ-994", "action": "summarize_rca"}'
@@ -119,3 +119,9 @@ To avoid unexpected GCP charges, you must cleanly tear down the infrastructure w
    chmod +x teardown.sh
    ./teardown.sh
    ```
+
+## Potential Improvements
+
+- Replace long-lived service account key authentication with GitHub OIDC + GCP Workload Identity Federation (short-lived credentials).
+- Keep key-based auth in this version to ensure reproducible setup in constrained learning environments where billing/organization IAM permissions for WIF may be unavailable.
+- Future work: add an OIDC-first bootstrap path with automatic fallback to the current key-based approach.

@@ -23,7 +23,14 @@ module "mig" {
   hostname          = "ai-backend"
   region            = var.region
   instance_template = module.mig_template.self_link
-  target_size       = 1
+  autoscaling_enabled = "true"
+  min_replicas        = 1
+  max_replicas        = 3
+  cooldown_period     = 60
+  autoscaling_cpu = [{
+    target            = 0.8
+    predictive_method = "NONE"
+  }]
   named_ports = [{
     name = "http"
     port = 8000
