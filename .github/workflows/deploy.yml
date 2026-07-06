@@ -71,7 +71,7 @@ jobs:
         retention-days: 1
 
   apply:
-    name: "Terraform Apply (Approved)"
+    name: "Terraform Apply"
     needs: plan
     environment: production # Triggers the manual approval gate in GitHub
     runs-on: ubuntu-latest
