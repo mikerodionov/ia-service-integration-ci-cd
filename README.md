@@ -66,6 +66,16 @@ If you use `bootstrap-oidc.sh`, validate these points before running deploy:
 6. GitHub secrets exist: `GCP_PROJECT_ID`, `GCP_WORKLOAD_ID_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `TF_VAR_jira_webhook_secret`, `TF_STATE_BUCKET`.
 7. Workflow auth step uses OIDC inputs (`workload_identity_provider` and `service_account`) instead of `credentials_json`.
 
+### CI/CD Identity and Permission Model
+Current workflows support dual authentication: OIDC is preferred when OIDC secrets are present, and service account key auth is used as fallback.
+
+1. GitHub workflow token permissions are intentionally minimal for OIDC:
+   - `id-token: write` (required to request OIDC token)
+   - `contents: read` (required to checkout source)
+2. In GCP, CI/CD runs as the `github-actions-deployer@<project-id>.iam.gserviceaccount.com` service account.
+3. Current bootstrap scripts grant `roles/owner` to this service account for setup simplicity in learning/playground environments.
+4. Therefore, the setup is not strict minimum privilege on the GCP side yet.
+
 ### Step 2: Terraform State Bucket Configuration
 The deploy workflow injects the backend bucket dynamically during `terraform init` using the `TF_STATE_BUCKET` GitHub secret.
 
