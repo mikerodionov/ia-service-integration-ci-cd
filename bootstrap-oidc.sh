@@ -186,7 +186,7 @@ inject_github_secrets() {
   gh secret set GCP_PROJECT_ID -b"$PROJECT_ID"
   gh secret set GCP_WORKLOAD_ID_PROVIDER -b"$provider_full_name"
   gh secret set GCP_SERVICE_ACCOUNT -b"$SA_EMAIL"
-  gh secret set TF_VAR_jira_webhook_secret -b"$JIRA_SECRET"
+  gh secret set TF_VAR_JIRA_WEBHOOK_SECRET -b"$JIRA_SECRET"
   gh secret set TF_STATE_BUCKET -b"$STATE_BUCKET"
 
   echo "    OIDC secrets configured."

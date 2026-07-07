@@ -43,7 +43,7 @@ jobs:
       env:
         TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
         TF_VAR_proxy_image: "dummy-value-for-destroy"
-        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
+        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_JIRA_WEBHOOK_SECRET }}
       run: terraform plan -destroy -out=tfdestroyplan
 
     - name: Upload Destroy Plan
@@ -96,5 +96,5 @@ jobs:
       env:
         TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
         TF_VAR_proxy_image: "dummy-value-for-destroy"
-        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
+        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_JIRA_WEBHOOK_SECRET }}
       run: terraform apply -auto-approve tfdestroyplan

@@ -65,7 +65,7 @@ jobs:
       env:
         TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
         TF_VAR_proxy_image: ${{ steps.build-image.outputs.image_uri }}
-        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
+        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_JIRA_WEBHOOK_SECRET }}
       run: |
         terraform fmt -check
         terraform validate
@@ -75,7 +75,7 @@ jobs:
       env:
         TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
         TF_VAR_proxy_image: ${{ steps.build-image.outputs.image_uri }}
-        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_jira_webhook_secret }}
+        TF_VAR_jira_webhook_secret: ${{ secrets.TF_VAR_JIRA_WEBHOOK_SECRET }}
       run: terraform plan -out=tfplan
 
     - name: Upload Terraform Plan

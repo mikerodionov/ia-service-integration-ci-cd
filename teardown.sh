@@ -92,7 +92,7 @@ if [ -n "${REPO_NWO}" ]; then
     delete_github_secret_if_present "GCP_WORKLOAD_ID_PROVIDER" "$REPO_NWO"
     delete_github_secret_if_present "GCP_SERVICE_ACCOUNT" "$REPO_NWO"
     delete_github_secret_if_present "GCP_PROJECT_ID" "$REPO_NWO"
-    delete_github_secret_if_present "TF_VAR_jira_webhook_secret" "$REPO_NWO"
+    delete_github_secret_if_present "TF_VAR_JIRA_WEBHOOK_SECRET" "$REPO_NWO"
     delete_github_secret_if_present "TF_STATE_BUCKET" "$REPO_NWO"
 else
     echo "[-] Could not resolve repository via gh CLI. Skipping secret cleanup."

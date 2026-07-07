@@ -94,7 +94,7 @@ JIRA_SECRET=${JIRA_SECRET:-my-secret-123}
 
 gh secret set GCP_PROJECT_ID -b"$PROJECT_ID"
 gh secret set GCP_SA_KEY < "$KEY_FILE"
-gh secret set TF_VAR_jira_webhook_secret -b"$JIRA_SECRET"
+gh secret set TF_VAR_JIRA_WEBHOOK_SECRET -b"$JIRA_SECRET"
 gh secret set TF_STATE_BUCKET -b"$STATE_BUCKET" # Injected for Partial Config
 
 echo "[+] Pruning older user-managed Service Account keys..."

@@ -63,7 +63,7 @@ If you use `bootstrap-oidc.sh`, validate these points before running deploy:
 3. Workload Identity Pool and Provider exist in GCP IAM (`global` location).
 4. Provider attribute condition matches your repository (`owner/repo`).
 5. Service account has `roles/iam.workloadIdentityUser` binding for your repo principal set.
-6. GitHub secrets exist: `GCP_PROJECT_ID`, `GCP_WORKLOAD_ID_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `TF_VAR_jira_webhook_secret`, `TF_STATE_BUCKET`.
+6. GitHub secrets exist: `GCP_PROJECT_ID`, `GCP_WORKLOAD_ID_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `TF_VAR_JIRA_WEBHOOK_SECRET`, `TF_STATE_BUCKET`.
 7. Workflow auth step uses OIDC inputs (`workload_identity_provider` and `service_account`) instead of `credentials_json`.
 
 ### CI/CD Identity and Permission Model
@@ -96,7 +96,7 @@ The deploy workflow injects the backend bucket dynamically during `terraform ini
 To make this deploy reliably from a fork/new repo:
 1. Ensure GitHub Actions is enabled for the fork.
 2. Run `./bootstrap.sh` from the forked local checkout connected to your fork remote.
-3. Confirm these repository secrets exist: `GCP_PROJECT_ID`, `GCP_SA_KEY`, `TF_VAR_jira_webhook_secret`, `TF_STATE_BUCKET`.
+3. Confirm these repository secrets exist: `GCP_PROJECT_ID`, `GCP_SA_KEY`, `TF_VAR_JIRA_WEBHOOK_SECRET`, `TF_STATE_BUCKET`.
 4. Ensure GCP billing is enabled and required APIs are enabled in the target project.
 5. Run the deploy workflow manually from Actions.
 
