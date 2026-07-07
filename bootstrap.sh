@@ -16,7 +16,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "===================================================="
-echo " Bootstrapping GCP Environment for CI/CD Deployment"
+echo " Bootstrapping GCP Environment for CI/CD Deployment (Key-based mode)"
 echo " Project: $PROJECT_ID"
 echo "===================================================="
 
@@ -32,7 +32,7 @@ echo "[+] Enabling required GCP APIs..."
 gcloud services enable \
   compute.googleapis.com \
   run.googleapis.com \
-    vpcaccess.googleapis.com \
+  vpcaccess.googleapis.com \
   secretmanager.googleapis.com \
   iam.googleapis.com \
   cloudresourcemanager.googleapis.com \
@@ -173,7 +173,7 @@ EOF
 fi
 
 echo "===================================================="
-echo " ✅ Bootstrap Complete! "
+echo " ✅ Bootstrap Complete (Key-based mode)! "
 echo " All secrets (including TF_STATE_BUCKET) injected."
-echo " You are ready to commit and push."
+echo " You are ready to run Deploy AI Architecture pipeline."
 echo "====================================$STATE_BUCKET================"

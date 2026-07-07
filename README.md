@@ -35,18 +35,36 @@ Before starting, ensure you have the following installed and authenticated on yo
 * A valid GCP Project with billing enabled.
 
 ### Step 1: Bootstrap the Environment
-To avoid "chicken-or-egg" deployment issues, a bootstrap script is provided to create the baseline resources required for the CI/CD pipeline (State Buckets, Artifact Registry, CI/CD Service Account, and GitHub Secrets).
+To avoid "chicken-or-egg" deployment issues, bootstrap scripts are provided to create the baseline resources required for the CI/CD pipeline (State Buckets, Artifact Registry, CI/CD Service Account, and GitHub Secrets).
 
 1. Clone this repository and navigate to the root directory.
-2. Make the script executable:
+2. Make the scripts executable:
    ```bash
-   chmod +x bootstrap.sh
+   chmod +x bootstrap.sh bootstrap-oidc.sh
    ```
-3. Run the bootstrap script:
+3. Choose one bootstrap mode:
+
+   **A) Key-based mode (legacy, easiest to start):**
    ```bash
    ./bootstrap.sh
    ```
-   *Note: The script will prompt you to enter the Jira Webhook Secret you want to use. It will automatically inject this securely into your GitHub Repository Secrets.*
+
+   **B) OIDC mode (recommended, less fragile long-term):**
+   ```bash
+   ./bootstrap-oidc.sh
+   ```
+
+   Both scripts prompt for the Jira Webhook Secret and inject required repository secrets.
+
+### OIDC Validation Checklist (Bulletproof Preflight)
+If you use `bootstrap-oidc.sh`, validate these points before running deploy:
+1. `gh auth status` is authenticated for the target repo account.
+2. `gcloud config get-value project` points to the intended GCP project.
+3. Workload Identity Pool and Provider exist in GCP IAM (`global` location).
+4. Provider attribute condition matches your repository (`owner/repo`).
+5. Service account has `roles/iam.workloadIdentityUser` binding for your repo principal set.
+6. GitHub secrets exist: `GCP_PROJECT_ID`, `GCP_WORKLOAD_ID_PROVIDER`, `GCP_SERVICE_ACCOUNT`, `TF_VAR_jira_webhook_secret`, `TF_STATE_BUCKET`.
+7. Workflow auth step uses OIDC inputs (`workload_identity_provider` and `service_account`) instead of `credentials_json`.
 
 ### Step 2: Terraform State Bucket Configuration
 The deploy workflow injects the backend bucket dynamically during `terraform init` using the `TF_STATE_BUCKET` GitHub secret.
@@ -114,7 +132,7 @@ To avoid unexpected GCP charges, you must cleanly tear down the infrastructure w
    * *Wait for this pipeline to complete successfully. It will execute `terraform destroy` to remove the Load Balancer, VMs, and Cloud Run proxy.*
 
 2. **Destroy the Bootstrap Resources (Local):**
-   Once the GitHub Actions destroy pipeline finishes, run the local teardown script to delete the foundational resources (Terraform State Bucket, Artifact Registry, and CI/CD Service Account).
+   Once the GitHub Actions destroy pipeline finishes, run the local teardown script to delete foundational resources. The teardown is universal and removes key-based and OIDC bootstrap artifacts when present.
    ```bash
    chmod +x teardown.sh
    ./teardown.sh
