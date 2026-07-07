@@ -15,10 +15,42 @@ cleanup() {
 
 trap cleanup EXIT
 
-echo "===================================================="
+if [ -t 1 ]; then
+    GREEN_TICK=$'\033[0;32m✓\033[0m'
+else
+    GREEN_TICK="✓"
+fi
+
+ensure_apis_enabled() {
+    local enabled_services
+    local -a missing_apis=()
+    local api
+
+    enabled_services="$(gcloud services list --enabled --format='value(config.name)' 2>/dev/null || true)"
+
+    for api in "$@"; do
+        if printf '%s\n' "$enabled_services" | grep -Fxq "$api"; then
+            echo "    $GREEN_TICK $api: already enabled."
+        else
+            missing_apis+=("$api")
+        fi
+    done
+
+    if [ ${#missing_apis[@]} -gt 0 ]; then
+        if ! gcloud services enable "${missing_apis[@]}" >/dev/null 2>&1; then
+            echo "❌ ERROR: Failed enabling one or more required GCP APIs."
+            exit 1
+        fi
+        for api in "${missing_apis[@]}"; do
+            echo "    $GREEN_TICK $api: enabled now."
+        done
+    fi
+}
+
+echo "====================================================================="
 echo " Bootstrapping GCP Environment for CI/CD Deployment (Key-based mode)"
 echo " Project: $PROJECT_ID"
-echo "===================================================="
+echo "====================================================================="
 
 # 0. Pre-flight Check: Ensure this is a Git repository
 if [ ! -d ".git" ]; then
@@ -29,15 +61,15 @@ fi
 
 # 1. Enable Required APIs
 echo "[+] Enabling required GCP APIs..."
-gcloud services enable \
-  compute.googleapis.com \
-  run.googleapis.com \
-  vpcaccess.googleapis.com \
-  secretmanager.googleapis.com \
-  iam.googleapis.com \
-  cloudresourcemanager.googleapis.com \
-  artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com
+ensure_apis_enabled \
+    compute.googleapis.com \
+    run.googleapis.com \
+    vpcaccess.googleapis.com \
+    secretmanager.googleapis.com \
+    iam.googleapis.com \
+    cloudresourcemanager.googleapis.com \
+    artifactregistry.googleapis.com \
+    cloudbuild.googleapis.com
 
 # 2. Create GCS Bucket for Terraform State
 echo "[+] Creating Terraform State Bucket ($STATE_BUCKET)..."
@@ -172,8 +204,9 @@ EOF
         fi
 fi
 
-echo "===================================================="
-echo " ✅ Bootstrap Complete (Key-based mode)! "
+echo "======================================================="
+echo " $GREEN_TICK Bootstrap Complete (Key-based mode)! "
 echo " All secrets (including TF_STATE_BUCKET) injected."
 echo " You are ready to run Deploy AI Architecture pipeline."
-echo "====================================$STATE_BUCKET================"
+echo " State bucket: $STATE_BUCKET"
+echo "======================================================="

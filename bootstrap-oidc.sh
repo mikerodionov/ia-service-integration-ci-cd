@@ -10,6 +10,12 @@ SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 POOL_ID="github-actions-pool-oidc"
 PROVIDER_ID="github-provider-oidc"
 
+if [[ -t 1 ]]; then
+  GREEN_TICK=$'\033[0;32m✓\033[0m'
+else
+  GREEN_TICK="✓"
+fi
+
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "❌ ERROR: '$1' is required but not installed/in PATH."
@@ -31,6 +37,65 @@ ensure_project() {
     echo "Run: gcloud config set project <PROJECT_ID>"
     exit 1
   fi
+}
+
+ensure_apis_enabled() {
+  local enabled_services
+  local -a missing_apis=()
+  local api
+
+  enabled_services="$(gcloud services list --enabled --format='value(config.name)' 2>/dev/null || true)"
+
+  for api in "$@"; do
+    if printf '%s\n' "$enabled_services" | grep -Fxq "$api"; then
+      echo "    $GREEN_TICK $api: already enabled."
+    else
+      missing_apis+=("$api")
+    fi
+  done
+
+  if [[ ${#missing_apis[@]} -gt 0 ]]; then
+    if ! gcloud services enable "${missing_apis[@]}" >/dev/null 2>&1; then
+      echo "❌ ERROR: Failed enabling one or more required GCP APIs."
+      exit 1
+    fi
+    for api in "${missing_apis[@]}"; do
+      echo "    $GREEN_TICK $api: enabled now."
+    done
+  fi
+}
+
+wait_for_workload_identity_pool() {
+  local attempts=10
+  local delay_seconds=2
+  local i
+
+  for ((i=1; i<=attempts; i++)); do
+    if gcloud iam workload-identity-pools describe "$POOL_ID" \
+      --location="global" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "$delay_seconds"
+  done
+
+  return 1
+}
+
+wait_for_workload_identity_provider() {
+  local attempts=10
+  local delay_seconds=2
+  local i
+
+  for ((i=1; i<=attempts; i++)); do
+    if [[ "$(gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
+      --location="global" \
+      --workload-identity-pool="$POOL_ID" --format='value(state)' 2>/dev/null || true)" == "ACTIVE" ]]; then
+      return 0
+    fi
+    sleep "$delay_seconds"
+  done
+
+  return 1
 }
 
 create_or_verify_bucket() {
@@ -74,34 +139,95 @@ grant_sa_roles() {
 }
 
 create_or_verify_pool() {
+  local pool_state
+
   echo "[+] Ensuring Workload Identity Pool exists: $POOL_ID"
-  if ! gcloud iam workload-identity-pools describe "$POOL_ID" \
-    --location="global" >/dev/null 2>&1; then
+  pool_state="$(gcloud iam workload-identity-pools describe "$POOL_ID" \
+    --location="global" --format='value(state)' 2>/dev/null || true)"
+
+  if [[ -z "$pool_state" ]]; then
     gcloud iam workload-identity-pools create "$POOL_ID" \
       --location="global" \
       --display-name="GitHub Actions OIDC Pool"
+  elif [[ "$pool_state" == "DELETED" ]]; then
+    echo "    Pool exists but is DELETED. Undeleting..."
+    gcloud iam workload-identity-pools undelete "$POOL_ID" \
+      --location="global" >/dev/null
   else
     echo "    Pool already exists."
+  fi
+
+  if ! wait_for_workload_identity_pool; then
+    echo "❌ ERROR: Workload Identity Pool '$POOL_ID' is not visible after waiting."
+    exit 1
   fi
 }
 
 create_or_verify_provider() {
   local repo_nwo="$1"
+  local provider_state
+  local create_output
+  local attempt
 
   echo "[+] Ensuring Workload Identity Provider exists: $PROVIDER_ID"
-  if ! gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
+  provider_state="$(gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
     --location="global" \
-    --workload-identity-pool="$POOL_ID" >/dev/null 2>&1; then
-    gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_ID" \
+    --workload-identity-pool="$POOL_ID" --format='value(state)' 2>/dev/null || true)"
+
+  if [[ "$provider_state" == "ACTIVE" ]]; then
+    echo "    Provider already exists."
+    return
+  elif [[ "$provider_state" == "DELETED" ]]; then
+    echo "    Provider exists but is DELETED. Undeleting..."
+    gcloud iam workload-identity-pools providers undelete "$PROVIDER_ID" \
+      --location="global" \
+      --workload-identity-pool="$POOL_ID" >/dev/null
+    if ! wait_for_workload_identity_provider; then
+      echo "❌ ERROR: Provider '$PROVIDER_ID' did not become ACTIVE after undelete."
+      exit 1
+    fi
+    return
+  fi
+
+  if ! wait_for_workload_identity_pool; then
+    echo "❌ ERROR: Cannot create provider because pool '$POOL_ID' is not visible."
+    exit 1
+  fi
+
+  for attempt in 1 2 3; do
+    if create_output=$(gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_ID" \
       --location="global" \
       --workload-identity-pool="$POOL_ID" \
       --display-name="GitHub OIDC Provider" \
       --issuer-uri="https://token.actions.githubusercontent.com" \
       --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
-      --attribute-condition="assertion.repository=='$repo_nwo'"
-  else
-    echo "    Provider already exists."
-  fi
+      --attribute-condition="assertion.repository=='$repo_nwo'" 2>&1); then
+      if ! wait_for_workload_identity_provider; then
+        echo "❌ ERROR: Provider '$PROVIDER_ID' did not become ACTIVE after creation."
+        exit 1
+      fi
+      echo "    Provider created."
+      return
+    fi
+
+    if echo "$create_output" | grep -qi "already exists"; then
+      echo "    Provider already exists."
+      return
+    fi
+
+    if echo "$create_output" | grep -qi "NOT_FOUND\|was not found"; then
+      echo "    Pool/provider propagation delay detected (attempt $attempt/3). Retrying..."
+      sleep 3
+      continue
+    fi
+
+    echo "❌ ERROR: Failed to create Workload Identity Provider."
+    echo "$create_output"
+    exit 1
+  done
+
+  echo "❌ ERROR: Failed to create Workload Identity Provider after retries."
+  exit 1
 }
 
 bind_repo_to_service_account() {
@@ -202,13 +328,13 @@ main() {
   ensure_git_repo
   ensure_project
 
-  echo "===================================================="
+  echo "================================================================"
   echo " Bootstrapping GCP Environment for CI/CD Deployment (OIDC mode)"
   echo " Project: $PROJECT_ID"
-  echo "===================================================="
+  echo "================================================================"
 
   echo "[+] Enabling required GCP APIs..."
-  gcloud services enable \
+  ensure_apis_enabled \
     compute.googleapis.com \
     run.googleapis.com \
     vpcaccess.googleapis.com \
@@ -250,12 +376,13 @@ main() {
   inject_github_secrets "$provider_full_name"
   configure_github_environment "$repo_nwo"
 
-  echo "===================================================="
-  echo " ✅ Bootstrap Complete (OIDC mode)!"
+  echo "============================================================================"
+  echo " $GREEN_TICK Bootstrap Complete (OIDC mode)!"
   echo " All secrets (including TF_STATE_BUCKET) injected."
   echo " OIDC secrets configured: GCP_WORKLOAD_ID_PROVIDER and GCP_SERVICE_ACCOUNT."
   echo " You are ready to run Deploy AI Architecture pipeline."
-  echo "===================================================="
+  echo " State bucket: $STATE_BUCKET"
+  echo "============================================================================"
 }
 
 main "$@"

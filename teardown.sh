@@ -10,6 +10,12 @@ SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 POOL_ID="github-actions-pool-oidc"
 PROVIDER_ID="github-provider-oidc"
 
+if [ -t 1 ]; then
+    GREEN_TICK=$'\033[0;32m✓\033[0m'
+else
+    GREEN_TICK="✓"
+fi
+
 delete_if_exists() {
     local description="$1"
     local check_cmd="$2"
@@ -104,5 +110,5 @@ else
 fi
 
 echo "===================================================="
-echo " ✅ Teardown Complete. Bootstrap resources destroyed."
+echo " $GREEN_TICK Teardown Complete. Bootstrap resources destroyed."
 echo "===================================================="
