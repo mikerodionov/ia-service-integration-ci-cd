@@ -14,10 +14,22 @@ delete_if_exists() {
     local description="$1"
     local check_cmd="$2"
     local delete_cmd="$3"
+    local delete_output
 
     if eval "$check_cmd" >/dev/null 2>&1; then
         echo "[!] Deleting $description..."
-        eval "$delete_cmd"
+        if ! delete_output=$(eval "$delete_cmd" 2>&1); then
+            # Idempotency guard: tolerate eventual-consistency races and already-deleted resources.
+            if echo "$delete_output" | grep -qi "NOT_FOUND\|was not found"; then
+                echo "[-] $description already deleted. Skipping."
+            elif eval "$check_cmd" >/dev/null 2>&1; then
+                echo "❌ ERROR: Failed deleting $description"
+                echo "$delete_output"
+                exit 1
+            else
+                echo "[-] $description already deleted. Skipping."
+            fi
+        fi
     else
         echo "[-] $description not found. Skipping."
     fi
@@ -56,17 +68,10 @@ delete_if_exists \
   "gcloud artifacts repositories describe $GAR_REPO --location=$REGION" \
   "gcloud artifacts repositories delete $GAR_REPO --location=$REGION --quiet"
 
-if gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
-    --location="global" \
-    --workload-identity-pool="$POOL_ID" >/dev/null 2>&1; then
-    echo "[!] Deleting Workload Identity Provider ($PROVIDER_ID)..."
-    gcloud iam workload-identity-pools providers delete "$PROVIDER_ID" \
-        --location="global" \
-        --workload-identity-pool="$POOL_ID" \
-        --quiet >/dev/null
-else
-    echo "[-] Workload Identity Provider ($PROVIDER_ID) not found. Skipping."
-fi
+delete_if_exists \
+    "Workload Identity Provider ($PROVIDER_ID)" \
+    "gcloud iam workload-identity-pools providers describe $PROVIDER_ID --location=global --workload-identity-pool=$POOL_ID" \
+    "gcloud iam workload-identity-pools providers delete $PROVIDER_ID --location=global --workload-identity-pool=$POOL_ID --quiet"
 
 delete_if_exists \
   "Workload Identity Pool ($POOL_ID)" \
