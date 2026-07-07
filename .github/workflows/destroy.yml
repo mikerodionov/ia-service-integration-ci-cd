@@ -3,6 +3,10 @@ name: Destroy AI Architecture
 on:
   workflow_dispatch: # Manual trigger only via GitHub UI
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   plan-destroy:
     name: "Terraform Destroy Plan"
@@ -11,7 +15,15 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
+    - name: Authenticate to Google Cloud (OIDC)
+      if: ${{ secrets.GCP_WORKLOAD_ID_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_ID_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+    - name: Authenticate to Google Cloud (Service Account Key Fallback)
+      if: ${{ !(secrets.GCP_WORKLOAD_ID_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '') }}
       uses: google-github-actions/auth@v2
       with:
         credentials_json: ${{ secrets.GCP_SA_KEY }}
@@ -47,7 +59,15 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
+    - name: Authenticate to Google Cloud (OIDC)
+      if: ${{ secrets.GCP_WORKLOAD_ID_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_ID_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+    - name: Authenticate to Google Cloud (Service Account Key Fallback)
+      if: ${{ !(secrets.GCP_WORKLOAD_ID_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '') }}
       uses: google-github-actions/auth@v2
       with:
         credentials_json: ${{ secrets.GCP_SA_KEY }}
